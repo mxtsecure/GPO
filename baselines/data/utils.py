@@ -1,5 +1,15 @@
-from data.constants import ALPACA_PROMPT, ALPACA_PROMPT_NO_INPUT, ALPHABET, LLAMA2_PROMPT, LLAMA2_SYSTEM_PROMPT
+from data.constants import (
+    ALPACA_PROMPT,
+    ALPACA_PROMPT_NO_INPUT,
+    ALPHABET,
+    LLAMA2_PROMPT,
+    LLAMA2_SYSTEM_PROMPT,
+    LLAMA3_PROMPT,
+    LLAMA3_SYSTEM_PROMPT,
+)
 import random
+
+
 def get_alpaca_prompt(instruction, input_text=None):
     if input_text is None:
         return ALPACA_PROMPT_NO_INPUT.format(instruction=instruction)
@@ -21,5 +31,17 @@ def get_llama2_prompt(user_message, system_prompt=None):
         prompt = prompt.replace("{{ system_prompt }}", system_prompt)
 
     prompt = prompt.replace("{{ user_message }}", user_message)
-    
+
+    return prompt
+
+
+def get_llama3_prompt(user_message, system_prompt=None):
+    prompt = LLAMA3_PROMPT
+    if system_prompt is None:
+        prompt = prompt.replace("{{system_prompt}}", LLAMA3_SYSTEM_PROMPT)
+    else:
+        prompt = prompt.replace("{{system_prompt}}", system_prompt)
+
+    prompt = prompt.replace("{{user_message}}", user_message)
+
     return prompt

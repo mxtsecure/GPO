@@ -14,7 +14,7 @@ from termcolor import colored
 from transformers import PreTrainedTokenizerBase
 import torch
 from data.constants import COUNTRIES, ALPHABET, GROUP_NAMES
-from data.utils import get_alpaca_prompt, get_options_str, get_llama2_prompt
+from data.utils import get_alpaca_prompt, get_options_str, get_llama2_prompt, get_llama3_prompt
 
 from datasets import (
     load_dataset, 
@@ -59,6 +59,10 @@ class AnthropicDataCollator_sft:
             prompt = get_alpaca_prompt(instruction=instruction, input_text=input_text)
         elif self.prompt_format == "llama2":
             prompt = get_llama2_prompt(user_message=input_text, system_prompt=instruction)
+        elif self.prompt_format == "llama3":
+            prompt = get_llama3_prompt(user_message=input_text, system_prompt=instruction)
+        else:
+            raise ValueError(f"Unsupported prompt_format {self.prompt_format}")
         return prompt + sampled_response[0]
   
 @dataclass
@@ -93,7 +97,7 @@ class AnthropicDataCollator_meta:
                 sampled = True
         
         # Tokenize
-        max_len = 4096 if self.prompt_format == "llama2" else 2048
+        max_len = 4096 if self.prompt_format in {"llama2", "llama3"} else 2048
         tokenized_data = self.tokenizer(
             processed_examples,
             padding=True,
@@ -153,6 +157,10 @@ class collator_regress_rm:
             prompt = get_alpaca_prompt(instruction=instruction, input_text=input_text)
         elif self.prompt_format == "llama2":
             prompt = get_llama2_prompt(user_message=input_text, system_prompt=instruction)
+        elif self.prompt_format == "llama3":
+            prompt = get_llama3_prompt(user_message=input_text, system_prompt=instruction)
+        else:
+            raise ValueError(f"Unsupported prompt_format {self.prompt_format}")
         return prompt + sampled_response[0], response_density
 
 def process_example_meta(meta_questions: List[str], meta_selections: List[List[float]], meta_options: List[List[str]], new_question: str, new_selections: List[float], new_options: List[str], prompt_format: str = "alpaca"):
@@ -184,6 +192,11 @@ def process_example_meta(meta_questions: List[str], meta_selections: List[List[f
     elif prompt_format == "llama2":
         input_text += '\nYour response: \n'
         prompt = get_llama2_prompt(user_message=input_text, system_prompt=instruction)
+    elif prompt_format == "llama3":
+        input_text += '\nYour response: \n'
+        prompt = get_llama3_prompt(user_message=input_text, system_prompt=instruction)
+    else:
+        raise ValueError(f"Unsupported prompt_format {prompt_format}")
     return prompt
 
 def get_country_list():

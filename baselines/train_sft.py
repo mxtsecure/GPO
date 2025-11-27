@@ -28,7 +28,7 @@ from data.anthropic_global_opinions import (
     AnthropicDataCollator_sft,
 )
 import data.helpers as ph
-from data.utils import get_alpaca_prompt, get_options_str, get_llama2_prompt
+from data.utils import get_alpaca_prompt, get_options_str, get_llama2_prompt, get_llama3_prompt
 from utils import (
     set_random_seed,
     prepare_ds,
@@ -99,7 +99,7 @@ class GroupAlignmentTrainer(Trainer):
 
     def get_predictions(self, sentence):
         # Encode the sentence using the tokenizer and return the model predictions.
-        max_len = 4096 if self.exp_config.prompt_format == "llama2" else 2048
+        max_len = 4096 if self.exp_config.prompt_format in {"llama2", "llama3"} else 2048
         inputs = self.tokenizer.encode(sentence, return_tensors="pt", max_length=max_len, truncation=True)
         with torch.no_grad():
             outputs = self.model(inputs)
@@ -168,7 +168,11 @@ class GroupAlignmentTrainer(Trainer):
                 prompt = get_alpaca_prompt(instruction=instruction, input_text=input_text)
             elif self.exp_config.prompt_format == 'llama2':
                 prompt = get_llama2_prompt(user_message=input_text, system_prompt=instruction)
-            word_probs = self.get_next_word_probabilities(prompt) 
+            elif self.exp_config.prompt_format == 'llama3':
+                prompt = get_llama3_prompt(user_message=input_text, system_prompt=instruction)
+            else:
+                raise ValueError(f"Unsupported prompt_format {self.exp_config.prompt_format}")
+            word_probs = self.get_next_word_probabilities(prompt)
             num_choices = len(ordinal)
             D_m = self.get_choice_probs(word_probs, num_choices)
             dm_values.append(list(D_m.values()))
@@ -191,7 +195,16 @@ class GroupAlignmentTrainer(Trainer):
 
 @hydra.main(config_path="configs", config_name="train_sft")
 def main(config: DictConfig) -> None:
-    config.prompt_format = 'alpaca' if 'alpaca' in config.model_ckpt else 'llama2' if 'llama' in config.model_ckpt else None
+    if 'alpaca' in config.model_ckpt:
+        config.prompt_format = 'alpaca'
+    elif 'llama-3' in config.model_ckpt or 'llama3' in config.model_ckpt:
+        config.prompt_format = 'llama3'
+    elif 'llama' in config.model_ckpt or 'lama' in config.model_ckpt:
+        config.prompt_format = 'llama2'
+    elif 'gemma' in config.model_ckpt or 'mistral' in config.model_ckpt:
+        config.prompt_format = 'alpaca'
+    else:
+        config.prompt_format = config.prompt_format or 'alpaca'
     group_str = INT_TO_GROUP[config.data.group_idx] if config.data.dataset == 'opinion_qa' else COUNTRIES[config.data.group_idx]
     config.expid += f"sft{config.prompt_format}{config.data.dataset}{group_str}_nosteertrain_numq{config.data.train_nq}seed_{config.seed}_lr{config.trainer.learning_rate}"
     set_random_seed(config.seed)

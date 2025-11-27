@@ -41,7 +41,7 @@ torch.set_num_threads(1)
 
 def prepare_collator(tokenizer, config):
     if config.data.task == "sft_pergroup":
-        collator = AnthropicDataCollator_sft(tokenizer=tokenizer)
+        collator = AnthropicDataCollator_sft(tokenizer=tokenizer, prompt_format=config.prompt_format)
     elif config.data.task == 'meta_SFT':
         collator = AnthropicDataCollator_meta(tokenizer=tokenizer, num_meta_questions=config.data.train_nq, prompt_format=config.prompt_format)
     else:
@@ -102,7 +102,7 @@ class GroupAlignmentTrainer(Trainer):
 
     def get_predictions(self, sentence):
         # Encode the sentence using the tokenizer and return the model predictions.
-        max_len = 4096 if self.exp_config.prompt_format == "llama2" else 2048
+        max_len = 4096 if self.exp_config.prompt_format in {"llama2", "llama3"} else 2048
         inputs = self.tokenizer.encode(sentence, return_tensors="pt", max_length=max_len, truncation=True)
         with torch.no_grad():
             outputs = self.model(inputs)
@@ -204,7 +204,16 @@ class GroupAlignmentTrainer(Trainer):
 @hydra.main(config_path="configs", config_name="train_incontextft")
 def main(config: DictConfig) -> None:
     """Set up parameters based on the configuration and initialize wandb."""
-    config.prompt_format = 'alpaca' if 'alpaca' in config.model_ckpt else 'llama2' if 'llama' in config.model_ckpt else None
+    if 'alpaca' in config.model_ckpt:
+        config.prompt_format = 'alpaca'
+    elif 'llama-3' in config.model_ckpt or 'llama3' in config.model_ckpt:
+        config.prompt_format = 'llama3'
+    elif 'llama' in config.model_ckpt or 'lama' in config.model_ckpt:
+        config.prompt_format = 'llama2'
+    elif 'gemma' in config.model_ckpt or 'mistral' in config.model_ckpt:
+        config.prompt_format = 'alpaca'
+    else:
+        config.prompt_format = config.prompt_format or 'alpaca'
     config.expid += f"lr{config.trainer.learning_rate}meta_{config.prompt_format}_split{config.data.group_split}ctx_numq{config.data.train_nq}seed{config.seed}{config.data.dataset}"
     set_random_seed(config.seed)
     dataset_name_map = {

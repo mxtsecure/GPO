@@ -52,7 +52,7 @@ from data.anthropic_global_opinions import (
     collator_regress_rm,
 )
 import data.helpers as ph
-from data.utils import get_alpaca_prompt, get_options_str, get_llama2_prompt
+from data.utils import get_alpaca_prompt, get_options_str, get_llama2_prompt, get_llama3_prompt
 from utils import (
     print_trainable_parameters, 
     set_random_seed,
@@ -226,6 +226,10 @@ class GroupAlignmentTrainer(Trainer):
                     prompt = get_alpaca_prompt(instruction=instruction, input_text=input_text)
                 elif self.exp_config.prompt_format == 'llama2':
                     prompt = get_llama2_prompt(user_message=input_text, system_prompt=instruction)
+                elif self.exp_config.prompt_format == 'llama3':
+                    prompt = get_llama3_prompt(user_message=input_text, system_prompt=instruction)
+                else:
+                    raise ValueError(f"Unsupported prompt_format {self.exp_config.prompt_format}")
 
                 for idx in range(len(options)):
                     this_prompt = prompt + ALPHABET[idx]
@@ -275,9 +279,17 @@ def main(config: DictConfig) -> None:
     if 'alpaca' in config.model_ckpt:
         config.prompt_format = 'alpaca'
         config.data.train_nq = 15
-    elif 'lama2' in config.model_ckpt:
+    elif 'llama-3' in config.model_ckpt or 'llama3' in config.model_ckpt:
+        config.prompt_format = 'llama3'
+        config.data.train_nq = 20
+    elif 'llama' in config.model_ckpt or 'lama' in config.model_ckpt:
         config.prompt_format = 'llama2'
         config.data.train_nq = 20
+    elif 'gemma' in config.model_ckpt or 'mistral' in config.model_ckpt:
+        config.prompt_format = 'alpaca'
+        config.data.train_nq = 15
+    else:
+        config.prompt_format = config.prompt_format or 'alpaca'
     config.expid = f"regressrm_{config.prompt_format}_{config.data.dataset}_{group_str}_numq{config.data.train_nq}_seed{config.seed}"
 
     set_random_seed(config.seed)

@@ -12,7 +12,7 @@ parentdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.sys.path.insert(0,parentdir) 
 from peft import PeftModel
 from data.constants import COUNTRIES, ALPHABET
-from data.utils import get_alpaca_prompt, get_options_str, get_llama2_prompt
+from data.utils import get_alpaca_prompt, get_options_str, get_llama2_prompt, get_llama3_prompt
 from termcolor import colored
 import pandas as pd
 pd.set_option('display.max_colwidth', None)
@@ -91,6 +91,10 @@ def get_oqa_gpo_dataset(config):
             prompt = get_alpaca_prompt(instruction=instruction, input_text=input_text)
         elif config.prompt_format == 'llama2':
             prompt = get_llama2_prompt(system_prompt=instruction, user_message=input_text)
+        elif config.prompt_format == 'llama3':
+            prompt = get_llama3_prompt(system_prompt=instruction, user_message=input_text)
+        else:
+            raise ValueError(f"Unsupported prompt_format {config.prompt_format}")
         return prompt
     merged_df['prompt'] = merged_df.apply(get_prompt, axis=1)
     df = merged_df
@@ -177,6 +181,10 @@ def get_anthropic_gpo_dataset(config):
                     prompt = get_alpaca_prompt(instruction=instruction, input_text=input_text)
                 elif config.prompt_format == 'llama2':
                     prompt = get_llama2_prompt(system_prompt=instruction, user_message=input_text)
+                elif config.prompt_format == 'llama3':
+                    prompt = get_llama3_prompt(system_prompt=instruction, user_message=input_text)
+                else:
+                    raise ValueError(f"Unsupported prompt_format {config.prompt_format}")
                 prompt = prompt + ALPHABET[key] + '. ' + value
                 new_entry = {**new_row, 'prompt_answer': prompt}
                 rows.append(new_entry)
@@ -193,10 +201,15 @@ def get_anthropic_gpo_dataset(config):
 def main(config: DictConfig) -> None:
     set_random_seed(config.seed)
     # get prompt + answer pairs into a dataset
-    if 'lama' in config.model:
+    ckpt = config.model.lower()
+    if 'llama-3' in ckpt or 'llama3' in ckpt:
+        config.prompt_format = 'llama3'
+    elif 'lama' in ckpt or 'llama' in ckpt:
         config.prompt_format = 'llama2'
-    elif 'alpaca' in config.model:
+    elif 'gemma' in ckpt or 'mistral' in ckpt or 'alpaca' in ckpt:
         config.prompt_format = 'alpaca'
+    else:
+        config.prompt_format = config.prompt_format or 'alpaca'
     data_csv = f'{config.save_path}emb_{config.prompt_format}_{config.dataset}.csv'
     if os.path.exists(data_csv):
         # if saved, can directly load and do not need to save again.

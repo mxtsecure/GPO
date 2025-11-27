@@ -217,3 +217,4 @@ class TaskType(str, Enum):
 class PromptFormatType(str, Enum):
     ALPACA = "alpaca"
     LLAMA2 = "llama2"
+    LLAMA3 = "llama3"

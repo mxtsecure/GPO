@@ -17,6 +17,7 @@ import hydra
 from omegaconf import DictConfig
 
 import data.helpers as ph
+from data.constants import PromptFormatType
 from data.utils import get_alpaca_prompt, get_options_str, get_llama2_prompt, get_llama3_prompt
 from utils import (
     set_random_seed,
@@ -34,15 +35,30 @@ class llmodel(nn.Module):
         self.model = model
         self.tokenizer = tokenizer
         self.config = config
-        if 'alpaca' in self.config.model_ckpt:
-            self.prompt_format = 'alpaca'
-        elif 'lama' in self.config.model_ckpt:
-            self.prompt_format = 'llama2'
+        ckpt = getattr(self.config, "model_ckpt", "").lower()
+        self.prompt_format = getattr(self.config, "prompt_format", None)
+
+        if "alpaca" in ckpt:
+            self.prompt_format = PromptFormatType.ALPACA.value
+        elif "llama-3" in ckpt or "llama3" in ckpt:
+            self.prompt_format = PromptFormatType.LLAMA3.value
+        elif "llama" in ckpt or "lama" in ckpt:
+            self.prompt_format = PromptFormatType.LLAMA2.value
+        elif "gemma" in ckpt or "mistral" in ckpt:
+            self.prompt_format = PromptFormatType.ALPACA.value
+
+        if self.prompt_format is None:
+            self.prompt_format = PromptFormatType.ALPACA.value
 
     def get_predictions(self, sentence):
         # Encode the sentence using the tokenizer and return the model predictions.
-        max_len = 4096 if self.prompt_format == "llama2" else 2048
-        inputs = self.tokenizer.encode(sentence, return_tensors="pt", max_length=max_len, truncation=True)
+        max_len = getattr(self.model.config, "max_position_embeddings", None)
+        if max_len is None or max_len == float("inf"):
+            max_len = getattr(self.tokenizer, "model_max_length", None)
+        if max_len is None or max_len == float("inf"):
+            max_len = 4096 if self.prompt_format in {PromptFormatType.LLAMA2.value, PromptFormatType.LLAMA3.value} else 2048
+
+        inputs = self.tokenizer.encode(sentence, return_tensors="pt", max_length=int(max_len), truncation=True)
         with torch.no_grad():
             outputs = self.model(inputs)
             predictions = outputs[0]
@@ -132,10 +148,14 @@ class llmodel(nn.Module):
                 elif steer == 'portray':
                     tmp = 'Answer the following question by selecting ONE of the listed options as if you are from '
                 instruction += '\n' + tmp + str(group)
-        if self.prompt_format == "alpaca":
+        if self.prompt_format == PromptFormatType.ALPACA.value:
             prompt = get_alpaca_prompt(instruction=instruction, input_text=input_text)
-        elif self.prompt_format == "llama2":
+        elif self.prompt_format == PromptFormatType.LLAMA2.value:
             prompt = get_llama2_prompt(user_message=input_text, system_prompt=instruction)
+        elif self.prompt_format == PromptFormatType.LLAMA3.value:
+            prompt = get_llama3_prompt(user_message=input_text, system_prompt=instruction)
+        else:
+            raise ValueError(f"Unsupported prompt format {self.prompt_format}")
             
         return prompt
 
@@ -144,10 +164,15 @@ class llmodel(nn.Module):
 def main(config: DictConfig) -> None:
     set_random_seed(config.seed)
     config.data.task = 'meta_SFT'
-    if 'alpaca' in config.model_ckpt:
-        config.prompt_format = 'alpaca'
-    elif 'lama' in config.model_ckpt:
-        config.prompt_format = 'llama2'
+    ckpt = getattr(config, "model_ckpt", "").lower()
+    if 'alpaca' in ckpt:
+        config.prompt_format = PromptFormatType.ALPACA.value
+    elif 'llama-3' in ckpt or 'llama3' in ckpt:
+        config.prompt_format = PromptFormatType.LLAMA3.value
+    elif 'llama' in ckpt or 'lama' in ckpt:
+        config.prompt_format = PromptFormatType.LLAMA2.value
+    elif 'gemma' in ckpt or 'mistral' in ckpt:
+        config.prompt_format = PromptFormatType.ALPACA.value
     dir_path = './baselines/base_model_results' # where to store the base model opinions
     if not os.path.exists(dir_path):
         os.mkdir(dir_path)
