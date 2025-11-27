@@ -53,6 +53,9 @@ class GroupAlignmentTrainer(Trainer):
         self.exp_config = config
         super().__init__(*args, **kwargs)
 
+    def _model_device(self):
+        return getattr(self.model, "device", next(self.model.parameters()).device)
+
     def evaluate(
         self,
         eval_dataset: Optional[Dataset] = None,
@@ -101,6 +104,7 @@ class GroupAlignmentTrainer(Trainer):
         # Encode the sentence using the tokenizer and return the model predictions.
         max_len = 4096 if self.exp_config.prompt_format in {"llama2", "llama3"} else 2048
         inputs = self.tokenizer.encode(sentence, return_tensors="pt", max_length=max_len, truncation=True)
+        inputs = inputs.to(self._model_device())
         with torch.no_grad():
             outputs = self.model(inputs)
             predictions = outputs[0]
@@ -215,7 +219,9 @@ def main(config: DictConfig) -> None:
     
     # Prepare dataset and model
     ds = prepare_ds(config)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model, tokenizer = prepare_model_tokenizer(config)
+    model.to(device)
 
     dt_now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     output_dir = os.path.join(config.trainer.output_dir, config.expid, dt_now)
