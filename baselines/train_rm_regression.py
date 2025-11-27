@@ -80,6 +80,9 @@ class GroupAlignmentTrainer(Trainer):
         self.exp_config = config
         super().__init__(*args, **kwargs)
 
+    def _model_device(self):
+        return getattr(self.model, "device", next(self.model.parameters()).device)
+
     def compute_loss(self, model, inputs, return_outputs=False):
 
         labels = inputs.pop("labels")
@@ -153,6 +156,7 @@ class GroupAlignmentTrainer(Trainer):
     def get_predictions(self, sentence):
         # Encode the sentence using the tokenizer and return the model predictions.
         inputs = self.tokenizer.encode(sentence, return_tensors="pt", max_length=2048)
+        inputs = inputs.to(self._model_device())
         with torch.no_grad():
             outputs = self.model(inputs)
             predictions = outputs[0]
@@ -293,13 +297,15 @@ def main(config: DictConfig) -> None:
     config.expid = f"regressrm_{config.prompt_format}_{config.data.dataset}_{group_str}_numq{config.data.train_nq}_seed{config.seed}"
 
     set_random_seed(config.seed)
-    wandb.init(project=config.project_name, 
+    wandb.init(project=config.project_name,
                notes=OmegaConf.to_yaml(config),
                name=config.expid)
     wandb.config.update(OmegaConf.to_container(config, resolve=True))
     ds = prepare_ds(config)
-    
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model, tokenizer = prepare_model_tokenizer(config, reward_model=True)
+    model.to(device)
 
     dt_now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     output_dir = os.path.join(config.trainer.output_dir, config.expid, dt_now)

@@ -33,12 +33,14 @@ torch.set_num_threads(1)
 
 
 
-class llmodel(nn.Module):  
-    def __init__(self, config, model, tokenizer):
+class llmodel(nn.Module):
+    def __init__(self, config, model, tokenizer, device):
         super(llmodel, self).__init__()  # Initializing the base class
         self.model = model
         self.tokenizer = tokenizer
         self.config = config
+        self.device = device
+        self.model.to(self.device)
         ckpt = self.config.model_ckpt.lower()
         if 'alpaca' in ckpt:
             self.prompt_format = 'alpaca'
@@ -55,6 +57,7 @@ class llmodel(nn.Module):
         # Encode the sentence using the tokenizer and return the model predictions.
         max_len = 4096 if self.prompt_format in {"llama2", "llama3"} else 2048
         inputs = self.tokenizer(sentence, return_tensors="pt", max_length=max_len, truncation=True)
+        inputs = inputs.to(self.device)
         with torch.no_grad():
             outputs = self.model(**inputs)
             predictions = outputs[0]
@@ -165,10 +168,11 @@ def main(config: DictConfig) -> None:
     if not os.path.exists(dir_path):
         os.mkdir(dir_path)
     print(dir_path)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     ds = prepare_ds(config)
     all_ds = ds['train'] + ds['test']
     model, tokenizer = prepare_model_tokenizer(config, load_pretrained=False)
-    llm_model = llmodel(config, model, tokenizer)
+    llm_model = llmodel(config, model, tokenizer, device)
     # Get the maximum accepted token size for the model
     max_token_size = model.config.max_position_embeddings
     print(f"The model's maximum accepted token size is: {max_token_size}")

@@ -93,7 +93,10 @@ def main():
     parser.add_argument('--eval_num_steps', type=int, default=10)
     parser.add_argument('--eval_logfile', type=str, default=None)
     parser.add_argument('--root', type=str, default=None)
-    args = parser.parse_args()  
+    args = parser.parse_args()
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    args.device = device
 
     if args.mode == 'eval':
         args.expid = 'eval'
@@ -119,7 +122,7 @@ def main():
         config['dim_x'] = 5120
 
     model = model_cls(**config)
-    model.cuda()
+    model.to(device)
 
     if args.dataset == 'oqa':
         wandb.init(project='group-alignment-gpo-oqa', name=args.expid, config=args)
@@ -135,7 +138,8 @@ def main():
 
 def load_datasets(args):
     torch.manual_seed(args.train_seed)
-    torch.cuda.manual_seed(args.train_seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(args.train_seed)
     np.random.seed(args.train_seed)
     random.seed(args.train_seed)
 
@@ -196,7 +200,7 @@ def train(args, model):
     ravg = RunningAverage()
     start_step = 1
     best_alignscore = 0
-    assert next(model.parameters()).is_cuda
+    assert next(model.parameters()).device == args.device
 
     for step in tqdm(range(start_step, args.num_steps+1)):
         model.train()
@@ -208,7 +212,7 @@ def train(args, model):
                 calculate_JD(args, model, eval_dataset, mode='eval')
 
         for batch in train_dataloader:
-            batch = {k: v.to('cuda') for k, v in batch.items()}
+            batch = {k: v.to(args.device) for k, v in batch.items()}
             outs = model(batch)
             outs.loss.backward()
             optimizer.step()
@@ -253,7 +257,7 @@ def train(args, model):
 
 def eval(args, model):
     if args.mode == 'eval':
-        ckpt = torch.load(os.path.join(args.root, 'ckpt.tar'), map_location='cuda')
+        ckpt = torch.load(os.path.join(args.root, 'ckpt.tar'), map_location=args.device)
         model.load_state_dict(ckpt.model)
     
     ravg = RunningAverage()
@@ -285,11 +289,11 @@ def calculate_JD(args, model, dataset, mode='eval', logging=True):
         for context_q_idx in context_questions:
             ctx_embeddings.append(group_questions[context_q_idx]['q_emb'])
             ctx_prob_ys.append(group_questions[context_q_idx]['prob_ys'][0])
-        ctx_embeddings = torch.cat(ctx_embeddings, dim=1).to('cuda')
-        ctx_prob_ys = torch.cat(ctx_prob_ys, dim=1).unsqueeze(-1).to('cuda', dtype=torch.float)
+        ctx_embeddings = torch.cat(ctx_embeddings, dim=1).to(args.device)
+        ctx_prob_ys = torch.cat(ctx_prob_ys, dim=1).unsqueeze(-1).to(args.device, dtype=torch.float)
         for target_q_idx in target_questions:
-            tar_embeddings = group_questions[target_q_idx]['q_emb'].to('cuda')
-            tar_prob_ys = group_questions[target_q_idx]['prob_ys'].to('cuda')
+            tar_embeddings = group_questions[target_q_idx]['q_emb'].to(args.device)
+            tar_prob_ys = group_questions[target_q_idx]['prob_ys'].to(args.device)
             with torch.no_grad():
                 predicted_distribution = model.predict(ctx_embeddings, ctx_prob_ys, tar_embeddings).loc
                 predicted_distribution = softmax_normalize(predicted_distribution.reshape(-1))
@@ -329,11 +333,11 @@ def calculate_WD(args, model, df, mode='eval', logging=True):
             # Get the dataframe for the current question
             question_df = group_df[group_df['qkey'] == question]
             # Extract embeddings and probabilities
-            embeddings = torch.stack([torch.tensor(e) for e in question_df['embedding'].tolist()]).unsqueeze(0).to('cuda')
+            embeddings = torch.stack([torch.tensor(e, device=args.device) for e in question_df['embedding'].tolist()]).unsqueeze(0)
             # Get the context for the current question
             context_df = group_df[group_df['qkey'].isin(context_questions)]
-            context_embeddings = torch.stack([torch.tensor(e) for e in context_df['embedding'].tolist()]).unsqueeze(0).to('cuda')
-            context_prob_ys = torch.tensor(context_df['prob_y'].values, dtype=torch.float).unsqueeze(0).unsqueeze(-1).to('cuda')
+            context_embeddings = torch.stack([torch.tensor(e, device=args.device) for e in context_df['embedding'].tolist()]).unsqueeze(0)
+            context_prob_ys = torch.tensor(context_df['prob_y'].values, dtype=torch.float, device=args.device).unsqueeze(0).unsqueeze(-1)
             if torch.isnan(context_embeddings).any():
                 print("Warning: NaN values detected in context_embeddings!")
             with torch.no_grad():
@@ -352,7 +356,7 @@ def calculate_WD(args, model, df, mode='eval', logging=True):
             D_H = ast.literal_eval(question_df['D_H'].iloc[0])
 
             # Convert the list to a tensor
-            D_H = torch.tensor(D_H, dtype=torch.float).to('cuda')
+            D_H = torch.tensor(D_H, dtype=torch.float, device=args.device)
             # Convert predicted_distribution and D_H to numpy
             predicted_distribution_np = predicted_distribution.cpu().detach().numpy()
             predicted_distribution_np = np.squeeze(predicted_distribution_np)

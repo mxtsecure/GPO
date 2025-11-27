@@ -29,12 +29,14 @@ from utils import (
 torch.set_num_threads(1)
 
 
-class llmodel(nn.Module):  
-    def __init__(self, config, model, tokenizer):
+class llmodel(nn.Module):
+    def __init__(self, config, model, tokenizer, device):
         super(llmodel, self).__init__()  # Initializing the base class
         self.model = model
         self.tokenizer = tokenizer
         self.config = config
+        self.device = device
+        self.model.to(self.device)
         ckpt = getattr(self.config, "model_ckpt", "").lower()
         self.prompt_format = getattr(self.config, "prompt_format", None)
 
@@ -59,6 +61,7 @@ class llmodel(nn.Module):
             max_len = 4096 if self.prompt_format in {PromptFormatType.LLAMA2.value, PromptFormatType.LLAMA3.value} else 2048
 
         inputs = self.tokenizer.encode(sentence, return_tensors="pt", max_length=int(max_len), truncation=True)
+        inputs = inputs.to(self.device)
         with torch.no_grad():
             outputs = self.model(inputs)
             predictions = outputs[0]
@@ -66,7 +69,7 @@ class llmodel(nn.Module):
     
     def get_sentence_embedding(self, sentence):
         # Encode the sentence using the tokenizer and feed it to the model.
-        inputs = self.tokenizer.encode(sentence, return_tensors="pt")
+        inputs = self.tokenizer.encode(sentence, return_tensors="pt").to(self.device)
         last_hidden_states = self.model(inputs, output_hidden_states=True).hidden_states[-1]
         last_token_embd = last_hidden_states[:, -1, :]
         return last_token_embd
@@ -177,10 +180,11 @@ def main(config: DictConfig) -> None:
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
     print(dir_path)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     ds = prepare_ds(config)
     all_ds = ds['train'] + ds['test']
     model, tokenizer = prepare_model_tokenizer(config, load_pretrained=False)
-    llm_model = llmodel(config, model, tokenizer)
+    llm_model = llmodel(config, model, tokenizer, device)
     # Get the maximum accepted token size for the model
     max_token_size = model.config.max_position_embeddings
     print(f"The model's maximum accepted token size is: {max_token_size}")
