@@ -19,7 +19,7 @@ from data.anthropic_global_opinions import (
     process_example_meta
 )
 import data.helpers as ph
-from data.utils import get_alpaca_prompt, get_options_str, get_llama2_prompt
+from data.utils import get_alpaca_prompt, get_options_str, get_llama2_prompt, get_llama3_prompt
 from utils import (
     set_random_seed,
     prepare_model_tokenizer,
@@ -39,16 +39,21 @@ class llmodel(nn.Module):
         self.model = model
         self.tokenizer = tokenizer
         self.config = config
-        if 'alpaca' in self.config.model_ckpt:
+        ckpt = self.config.model_ckpt.lower()
+        if 'alpaca' in ckpt:
             self.prompt_format = 'alpaca'
-        elif 'lama' in self.config.model_ckpt:
+        elif 'llama-3' in ckpt or 'llama3' in ckpt:
+            self.prompt_format = 'llama3'
+        elif 'llama' in ckpt or 'lama' in ckpt:
             self.prompt_format = 'llama2'
-        else:
+        elif 'gemma' in ckpt or 'mistral' in ckpt:
             self.prompt_format = 'alpaca'
+        else:
+            self.prompt_format = getattr(self.config, "prompt_format", 'alpaca')
 
     def get_predictions(self, sentence):
         # Encode the sentence using the tokenizer and return the model predictions.
-        max_len = 4096 if self.prompt_format == "llama2" else 2048
+        max_len = 4096 if self.prompt_format in {"llama2", "llama3"} else 2048
         inputs = self.tokenizer(sentence, return_tensors="pt", max_length=max_len, truncation=True)
         with torch.no_grad():
             outputs = self.model(**inputs)
@@ -134,6 +139,10 @@ class llmodel(nn.Module):
             prompt = get_alpaca_prompt(instruction=instruction, input_text=input_text)
         elif self.prompt_format == "llama2":
             prompt = get_llama2_prompt(user_message=input_text, system_prompt=instruction)
+        elif self.prompt_format == "llama3":
+            prompt = get_llama3_prompt(user_message=input_text, system_prompt=instruction)
+        else:
+            raise ValueError(f"Unsupported prompt format {self.prompt_format}")
         return prompt
 
 
@@ -141,10 +150,17 @@ class llmodel(nn.Module):
 def main(config: DictConfig) -> None:
     set_random_seed(config.seed)
     config.data.task = 'meta_SFT'
-    if 'alpaca' in config.model_ckpt:
+    ckpt = config.model_ckpt.lower()
+    if 'alpaca' in ckpt:
         config.prompt_format = 'alpaca'
-    elif 'lama' in config.model_ckpt:
+    elif 'llama-3' in ckpt or 'llama3' in ckpt:
+        config.prompt_format = 'llama3'
+    elif 'llama' in ckpt or 'lama' in ckpt:
         config.prompt_format = 'llama2'
+    elif 'gemma' in ckpt or 'mistral' in ckpt:
+        config.prompt_format = 'alpaca'
+    else:
+        config.prompt_format = config.prompt_format or 'alpaca'
     dir_path = './baselines/base_model_results/few_shots' # where to store the base model opinions
     if not os.path.exists(dir_path):
         os.mkdir(dir_path)
