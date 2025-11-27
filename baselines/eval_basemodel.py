@@ -17,7 +17,7 @@ import hydra
 from omegaconf import DictConfig
 
 import data.helpers as ph
-from data.utils import get_alpaca_prompt, get_options_str, get_llama2_prompt
+from data.utils import get_alpaca_prompt, get_options_str, get_llama2_prompt, get_llama3_prompt
 from utils import (
     set_random_seed,
     prepare_model_tokenizer,

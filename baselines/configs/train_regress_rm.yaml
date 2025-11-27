@@ -19,7 +19,7 @@ data:
   task: reward_model_regress
   #dataset: opinion_qa
   dataset: anthropic_global_opinions
-  oqa_datapath: ./OQA_data/ #
+  oqa_datapath: /data/xiangtao/projects/crossdefense/code/defense/fairness/Group-Preference-Optimization/QQA_data/ #
   group_idx: 0 # finetune which group
   group: None
   PEW_SURVEY_LIST: [26, 27, 29, 32, 34, 36, 41, 42, 43, 45, 49, 50, 54, 82, 92] 

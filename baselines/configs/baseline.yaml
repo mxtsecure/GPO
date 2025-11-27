@@ -1,9 +1,9 @@
 project_name: group-alignment-sft
 expid: None
-model_ckpt: ./recover_weights_alpaca_7b
+model_ckpt: /data/xiangtao/projects/LLM/Meta-Llama-3-8B-Instruct
 #model_ckpt: ./llama-2-7b-chat-hf
-prompt_format: llama2
-use_int8: True
+prompt_format: llama3
+use_int8: False
 
 lora:
   r: 12
@@ -16,7 +16,7 @@ data:
   task: meta_SFT # in-context-finetuning
   #dataset: opinion_qa
   dataset: anthropic_global_opinions
-  oqa_datapath: ./OQA_data/ 
+  oqa_datapath: /data/xiangtao/projects/crossdefense/code/defense/fairness/Group-Preference-Optimization/QQA_data/
   group_idx: 0
   group_split: 0.4 # meta train group percentage
   CONTEXT: default 

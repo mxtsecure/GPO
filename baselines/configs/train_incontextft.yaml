@@ -15,7 +15,7 @@ data:
   task: meta_SFT # in-context-finetuning
   #dataset: opinion_qa
   dataset: anthropic_global_opinions
-  oqa_datapath: ./OQA_data/ 
+  oqa_datapath: /data/xiangtao/projects/crossdefense/code/defense/fairness/Group-Preference-Optimization/QQA_data/ 
   group_split: 0.4 # meta train group percentage
   CONTEXT: default 
   train_nq: 20 # defines the number of context questions

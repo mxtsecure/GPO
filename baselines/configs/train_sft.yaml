@@ -3,7 +3,7 @@ expid: None
 
 model_ckpt: /localhome/data/ckpts/shared/recover_weights_alpaca_7b
 prompt_format: alpaca
-use_int8: True
+use_int8: False
 
 lora:
   r: 12
@@ -16,7 +16,7 @@ data:
   task: sft_pergroup
   #dataset: opinion_qa
   dataset: anthropic_global_opinions
-  oqa_datapath: ./OQA_data/ 
+  oqa_datapath: /data/xiangtao/projects/crossdefense/code/defense/fairness/Group-Preference-Optimization/QQA_data/ 
   group_idx: 0 # finetune which group
   CONTEXT: default # [default, steer-portray, steer-qa]
   train_nq: 15 # how many questions are used to train.

@@ -199,6 +199,14 @@ LLAMA2_SYSTEM_PROMPT = """You are a helpful, respectful and honest assistant. Al
 If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information."""
 
 
+LLAMA3_PROMPT = """<|begin_of_text|>
+<|start_header_id|>system<|end_header_id|>
+{{system_prompt}}<|eot_id|>
+<|start_header_id|>user<|end_header_id|>
+{{user_message}}<|eot_id|>
+<|start_header_id|>assistant<|end_header_id|>
+"""
+LLAMA3_SYSTEM_PROMPT = """You are a helpful, honest, and harmless assistant."""
 
 class TaskType(str, Enum):
     SFT = "SFT"
