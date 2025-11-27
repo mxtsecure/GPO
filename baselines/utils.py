@@ -199,7 +199,10 @@ def prepare_ds(config):
             config.trainer.reproduce_exp_log_dir += 'meta_sft_logs' 
         elif config.data.task == 'sft_pergroup':
             config.trainer.reproduce_exp_log_dir += 'sft_logs'
-        train_test_groups_df.to_csv(f'{config.trainer.reproduce_exp_log_dir}/{config.expid}_train_test_groups.csv', index=False)
+        # train_test_groups_df.to_csv(f'{config.trainer.reproduce_exp_log_dir}/{config.expid}_train_test_groups.csv', index=False)
+        save_path = f'{config.trainer.reproduce_exp_log_dir}/{config.expid}_train_test_groups.csv'
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)  # 关键：递归创建目录
+        train_test_groups_df.to_csv(save_path, index=False)
 
         # Group the DataFrame by 'group' and create a list of DataFrames
         grouped = list(df.groupby('group'))

@@ -175,7 +175,7 @@ def main(config: DictConfig) -> None:
         config.prompt_format = PromptFormatType.ALPACA.value
     dir_path = './baselines/base_model_results' # where to store the base model opinions
     if not os.path.exists(dir_path):
-        os.mkdir(dir_path)
+        os.makedirs(dir_path)
     print(dir_path)
     ds = prepare_ds(config)
     all_ds = ds['train'] + ds['test']

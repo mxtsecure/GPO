@@ -1,8 +1,8 @@
 project_name: "group-alignment-sft-anthropic-alpaca"
 expid: None
 
-model_ckpt: /localhome/data/ckpts/shared/recover_weights_alpaca_7b
-prompt_format: alpaca
+model_ckpt: /data/xiangtao/projects/LLM/Meta-Llama-3-8B-Instruct
+prompt_format: llama3
 use_int8: False
 
 lora:
